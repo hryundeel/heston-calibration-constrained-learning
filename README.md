@@ -21,7 +21,8 @@ This project measures whether, at a fixed model size, putting that domain knowle
 | `src/` | Python package | 3.2 |
 | `tests/` | Test suite | 0.2 |
 | `experiments/` | Run configurations and analysis scripts. Data and run outputs stay out of git (see 3.3). | 3.4 |
-| `thesis/` | LaTeX source, including `references.bib` and `figures/`. Mirrored to Overleaf. | 0.5 |
+| `thesis/` | LaTeX source from the AGH template: `thesis.tex`, the chapter files, `bibliography.bib`, and images in `pix/`. Published to Overleaf as drafts. | 0.5 |
+| `.github/workflows/` | CI, starting with the thesis build | 0.5 |
 
 ## Project plan
 
@@ -51,14 +52,14 @@ These tables are the current plan. They differ from the [original](docs/thesis-p
 | 0.2 | Python tooling: uv, ruff, pytest, pre-commit (including the guard against commits on `main`) | `chore` | ⬜ |
 | 0.3 | CI on every pull request: lint and tests | `chore` | ⬜ |
 | 0.4 | [Repository settings](#repository-settings) applied; pull request template | `chore` | ⬜ |
-| 0.5 | Thesis source in `thesis/` from the university template, building locally and in CI | `thesis` | ⬜ |
+| 0.5 | Thesis source in `thesis/` from the university template, building locally and in CI | `thesis` | ✅ |
 | 0.6 | Scripts that [publish a draft to Overleaf and collect the supervisor's review](#drafts-and-supervisor-review) | `chore` | ⬜ |
 
 **Checkpoint `phase-0`:** repository settings are applied, CI checks code and builds the thesis on every pull request, and `draft-1` is on Overleaf.
 
 ### Phase 1 — Domain and literature
 
-Notes go in `docs/notes/`. BibTeX entries go in `thesis/references.bib`.
+Notes go in `docs/notes/`. BibTeX entries go in `thesis/bibliography.bib`.
 
 | ID | Deliverable | Type | Status |
 |---|---|---|---|
@@ -300,9 +301,17 @@ Tags (`phase-N` and `draft-N`) are never moved or deleted. Phases can overlap: a
 
 ### Writing the thesis
 
-- **Where the source lives.** `thesis/` holds the LaTeX source, starting from the university's Overleaf template, with `main.tex` at its root. Write in any editor. The build command is set up in 0.5, and CI builds the PDF on every pull request.
+- **Where the source lives.** `thesis/` holds the LaTeX source from the AGH template. The main file is `thesis.tex`, which includes the chapter files. It compiles with pdfLaTeX and BibTeX. Write in any editor.
+- **Building it locally.** This needs TeX Live, the same distribution Overleaf uses (`brew install --cask mactex-no-gui` on macOS). Tectonic is no substitute: its engine drops the Polish letters on the title page.
+  ```bash
+  cd thesis
+  latexmk -pdf thesis.tex   # build thesis.pdf
+  latexmk -c                # remove build files, keep the PDF
+  ```
+  Build files and the PDF are ignored by git.
+- **Building it in CI.** Every pull request that touches `thesis/` builds the PDF with pdfLaTeX. The result can be downloaded as the `thesis-pdf` artifact of that run.
 - **Same rules as code.** Thesis work follows the same branches and pull requests as everything else (`thesis/<id>-<slug>`). The PR that completes a section ticks its task.
-- **Bibliography and figures.** BibTeX entries go in `thesis/references.bib`, and reading notes go in `docs/notes/`. Figures are produced by scripts in `experiments/`, written to `thesis/figures/` and committed as plain files.
+- **Bibliography and figures.** BibTeX entries go in `thesis/bibliography.bib`, and reading notes go in `docs/notes/`. Figures are produced by scripts in `experiments/`, written to `thesis/pix/` (the template's image folder) and committed as plain files. Export plots as PDF: SVG would need Inkscape, which only Overleaf has.
 - **Supervisor feedback** arrives through Overleaf and comes back into the repository through the [review cycle](#drafts-and-supervisor-review).
 
 ### Drafts and supervisor review

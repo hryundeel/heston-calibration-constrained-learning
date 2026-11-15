@@ -1,0 +1,97 @@
+\documentclass[en]{aghdpl}
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+%\usepackage[english,polish]{babel}
+%\usepackage{polski}
+\usepackage[utf8]{inputenc}
+
+% dodatkowe pakiety
+\usepackage{mathtools}
+\usepackage{amsfonts}
+\usepackage{svg}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{rotating}
+\usepackage{rotfloat}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{tabu, multirow}
+\usepackage{geometry}
+\usepackage{url}
+\usepackage{courier}
+\usepackage{listings}
+\AtBeginDocument{
+	\renewcommand{\tablename}{Tabela}
+	\renewcommand{\figurename}{Rys.}
+}
+
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{makecell}
+\usepackage[flushleft]{threeparttable}
+\usepackage{longtable}
+\urlstyle{tt}
+
+\graphicspath{{./pix/}}
+
+\newcolumntype{C}[1]{>{\hsize=#1\hsize\centering\arraybackslash}X}
+
+\newcommand{\specialcell}[2][c]{%
+  \begin{tabular}[#1]{@{}c@{}}#2\end{tabular}}
+
+\author{Justin Bieber}
+\shortauthor{J. Bieber}
+
+\titlePL{Temat po polsku}
+\shorttitlePL{Krótki temat po polsku}
+\titleEN{Topic in English}
+\shorttitleEN{Short title in English}
+
+\thesistypeEN{Diploma Project}
+\thesistypePL{Projekt dyplomowy}
+
+\supervisorPL{dr inż. Krzysztof Kluza}
+\supervisorEN{Krzysztof Kluza, PhD}
+
+\degreeprogramme{Computer Science}
+
+\date{2025}
+
+\department{~}
+
+\facultyEN{Faculty of Electrical Engineering, Automatics, \\Computer Science and Biomedical Engineering}
+
+\facultyPL{Wydział Elektrotechniki, Automatyki, \\ Informatyki i Inżynierii Biomedycznej}
+
+\abstractPL{Krótki abstrakt po polsku...}
+
+\abstractEN{Abstract in English...}
+
+\acknowledgements{Acknowledgements and thanks for the supervisor and other people helping in thesis preparation.}
+
+\setlength{\cftsecnumwidth}{10mm}
+\setcounter{secnumdepth}{4}
+\brokenpenalty=10000\relax
+
+\begin{document}
+
+\titlepages
+
+\setcounter{tocdepth}{2}
+\tableofcontents
+\clearpage
+
+%\listoffigures
+%\listoftables
+
+\include{chapter1}
+\include{chapter2}
+\include{chapter3}
+
+\bibliographystyle{plain}
+\bibliography{bibliography}
+
+%\appendix
+\include{appendix}
+\end{document}
