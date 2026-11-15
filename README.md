@@ -50,7 +50,7 @@ These tables are the current plan. They differ from the [original](docs/thesis-p
 | ID | Deliverable | Type | Status |
 |---|---|---|---|
 | 0.1 | README, original plan and decision log | `docs` | ✅ |
-| 0.2 | Python tooling: uv, ruff, pytest, pre-commit (including the guard against commits on `main`) | `chore` | ⬜ |
+| 0.2 | Python tooling: uv, ruff, pytest, pre-commit (including the guard against commits on `main`) | `chore` | ✅ |
 | 0.3 | CI on every pull request: lint and tests | `chore` | ⬜ |
 | 0.4 | [Repository settings](#repository-settings) applied; pull request template | `chore` | ⬜ |
 | 0.5 | Thesis source in `thesis/` from the university template, building locally and in CI | `thesis` | ✅ |
@@ -179,6 +179,30 @@ Components are listed in dependency order, and each one is validated before the 
 | 4. Conclusions | What was found, what it means in practice, where it applies, what is left open | 8.3 |
 
 ## How to work
+
+### Setting up a clone
+
+The project uses [uv](https://docs.astral.sh/uv/) for Python. The development tools (ruff, pytest, pre-commit) are locked in `uv.lock`.
+
+```bash
+uv sync                       # create .venv with the locked tools
+uv run pre-commit install     # once per clone: run the hooks below on every commit
+```
+
+The hooks:
+- refuse commits made directly on `main`;
+- catch leftover merge-conflict markers, broken YAML and files over 2 MB;
+- lint and format Python with ruff.
+
+To run the same checks by hand:
+
+```bash
+uv run ruff check . && uv run ruff format --check .
+uv run pytest
+uv run pre-commit run --all-files
+```
+
+Ruff's rules are set in `pyproject.toml`: line length 100, plus import order, modern syntax and likely bugs on top of the defaults. Building the thesis needs TeX Live as well (see [Writing the thesis](#writing-the-thesis)).
 
 ### Making progress
 
