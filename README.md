@@ -23,7 +23,7 @@ This project measures whether, at a fixed model size, putting that domain knowle
 | `experiments/` | Run configurations and analysis scripts. Data and run outputs stay out of git (see 3.3). | 3.4 |
 | `thesis/` | LaTeX source from the AGH template: `thesis.tex`, the chapter files, `bibliography.bib`, and images in `pix/`. Published to Overleaf as drafts. | 0.5 |
 | `scripts/` | `publish-draft` and `collect-review` for the Overleaf review cycle, and `test-drafts`, which tests them | 0.6 |
-| `.github/workflows/` | CI, starting with the thesis build | 0.5 |
+| `.github/workflows/` | CI: `checks.yml` runs ruff and pytest, `thesis.yml` builds the PDF | 0.3, 0.5 |
 
 ## Project plan
 
@@ -51,7 +51,7 @@ These tables are the current plan. They differ from the [original](docs/thesis-p
 |---|---|---|---|
 | 0.1 | README, original plan and decision log | `docs` | ✅ |
 | 0.2 | Python tooling: uv, ruff, pytest, pre-commit (including the guard against commits on `main`) | `chore` | ✅ |
-| 0.3 | CI on every pull request: lint and tests | `chore` | ⬜ |
+| 0.3 | CI on every pull request: lint and tests | `chore` | ✅ |
 | 0.4 | [Repository settings](#repository-settings) applied; pull request template | `chore` | ⬜ |
 | 0.5 | Thesis source in `thesis/` from the university template, building locally and in CI | `thesis` | ✅ |
 | 0.6 | Scripts that [publish a draft to Overleaf and collect the supervisor's review](#drafts-and-supervisor-review) | `chore` | ✅ |
@@ -201,6 +201,8 @@ uv run ruff check . && uv run ruff format --check .
 uv run pytest
 uv run pre-commit run --all-files
 ```
+
+CI repeats the ruff and pytest checks on every pull request and every push to `main` (`.github/workflows/checks.yml`). It installs exactly the versions in `uv.lock`, and it fails if `uv.lock` is out of date with `pyproject.toml`. Merge only when it is green.
 
 Ruff's rules are set in `pyproject.toml`: line length 100, plus import order, modern syntax and likely bugs on top of the defaults. Building the thesis needs TeX Live as well (see [Writing the thesis](#writing-the-thesis)).
 
