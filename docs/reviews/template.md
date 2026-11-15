@@ -3,6 +3,7 @@
 - **Draft:** `draft-N`
 - **Feedback received:** YYYY-MM-DD
 - **Suggested edits:** N accepted, N rejected
+- **Overleaf commit:** filled in by `scripts/collect-review`; leave it as is
 
 ## Rejected edits
 
