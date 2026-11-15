@@ -35,7 +35,7 @@ These tables are the current plan. They differ from the [original](docs/thesis-p
 
 | Phase | Outcome | Status |
 |---|---|---|
-| [0 · Project setup](#phase-0--project-setup) | Workflow, tooling, CI and the thesis source in place | 🟡 |
+| [0 · Project setup](#phase-0--project-setup) | Workflow, tooling, CI and the thesis source in place | ✅ `phase-0` |
 | [1 · Domain and literature](#phase-1--domain-and-literature) | Command of Heston, its failures, and prior work | ⬜ |
 | [2 · Experimental design](#phase-2--experimental-design) | Protocol frozen before any run | ⬜ |
 | [3 · System design](#phase-3--system-design) | Skeleton runs end to end on placeholders | ⬜ |
@@ -57,6 +57,21 @@ These tables are the current plan. They differ from the [original](docs/thesis-p
 | 0.6 | Scripts that [publish a draft to Overleaf and collect the supervisor's review](#drafts-and-supervisor-review) | `chore` | ✅ |
 
 **Checkpoint `phase-0`:** repository settings are applied, CI checks code and builds the thesis on every pull request, and `draft-1` is on Overleaf.
+
+> **Closed 2026-11-15.**
+>
+> - **Delivered:**
+>   - the README with the plan and the working rules, and the decision log;
+>   - Python tooling, with a pre-commit hook that refuses commits on `main`;
+>   - CI that runs ruff and pytest and builds the thesis PDF;
+>   - squash-only repository settings and a PR template;
+>   - the unchanged AGH template in `thesis/`;
+>   - `publish-draft` and `collect-review` for the Overleaf review cycle.
+> - **`draft-1`** (`f7bf977`) is a pipeline test: only the cover page is filled in, and the supervisor is invited from a later draft. Overleaf received exactly `thesis/` from `main`.
+> - **Decision records accepted:** [0001](docs/decisions/0001-research-plan-changes.md).
+> - **Carried forward:**
+>   - whether Overleaf comments survive a publish, and whether unaccepted suggestions reach git, to be checked in the first review cycle;
+>   - the template's formatting questions for the supervisor, listed in PR #3.
 
 ### Phase 1 — Domain and literature
 
