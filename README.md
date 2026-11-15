@@ -52,7 +52,7 @@ These tables are the current plan. They differ from the [original](docs/thesis-p
 | 0.1 | README, original plan and decision log | `docs` | ✅ |
 | 0.2 | Python tooling: uv, ruff, pytest, pre-commit (including the guard against commits on `main`) | `chore` | ✅ |
 | 0.3 | CI on every pull request: lint and tests | `chore` | ✅ |
-| 0.4 | [Repository settings](#repository-settings) applied; pull request template | `chore` | ⬜ |
+| 0.4 | [Repository settings](#repository-settings) applied; pull request template | `chore` | ✅ |
 | 0.5 | Thesis source in `thesis/` from the university template, building locally and in CI | `thesis` | ✅ |
 | 0.6 | Scripts that [publish a draft to Overleaf and collect the supervisor's review](#drafts-and-supervisor-review) | `chore` | ✅ |
 
@@ -264,7 +264,7 @@ fix/pricer-short-maturity-nan
   docs(2): close phase 2, protocol frozen
   fix(pricer): guard against NaN at short maturities
   ```
-- **The PR description** says what changed, why, and how it was checked, and it links any decision records.
+- **The PR description** says what changed, why, and how it was checked, and it links any decision records. The template in `.github/pull_request_template.md` prefills those headings. The description becomes the body of the squash commit, so keep it to what is worth reading in `git log`.
 - Commits inside a branch are free-form, because they are squashed on merge.
 - **No more than two PRs are open at once.** A third usually means one of them should be finished or split.
 
@@ -400,7 +400,8 @@ If nothing changed on Overleaf, it says so and stops. For comments without edits
 These are applied in task 0.4. The repository is private on GitHub's free plan, so GitHub does not enforce any rules on `main`. Every change still goes through a pull request that you merge yourself, and the guards below catch mistakes.
 
 - Only squash merging is enabled, and the default commit message is the PR title and description.
-- Head branches are deleted automatically after merging.
+- Head branches are deleted automatically after merging. Delete your local copy with `git branch -D <branch>`; `-D` is needed because git can't see that a squash-merged branch has been merged.
+- New pull requests start from the template in `.github/pull_request_template.md`.
 - A pre-commit hook (`no-commit-to-branch`, set up in 0.2) refuses commits made directly on `main`.
 
 If the account ever has GitHub Pro, add the enforced version: protect `main` (pull request required, passing checks and an up-to-date branch required, linear history, no force-pushes or deletion).
