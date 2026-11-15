@@ -16,6 +16,7 @@ This project measures whether, at a fixed model size, putting that domain knowle
 | `docs/thesis-plan.md` | The original plan, kept as written | 0.1 |
 | `docs/decisions/` | Decision log: research and thesis decisions, and every change to the research plan | 0.1 |
 | `docs/notes/` | Working notes and literature notes | 1.1 |
+| `docs/reviews/` | Supervisor feedback on each draft, and what was done about it | 0.6 |
 | `docs/` | Design documents that are deliverables: protocol (2.7), system design (3.1), failure catalogue (5.1) | 2.7 |
 | `src/` | Python package | 3.2 |
 | `tests/` | Test suite | 0.2 |
@@ -51,7 +52,7 @@ These tables are the current plan. They differ from the [original](docs/thesis-p
 | 0.3 | CI on every pull request: lint and tests | `chore` | ⬜ |
 | 0.4 | [Repository settings](#repository-settings) applied; pull request template | `chore` | ⬜ |
 | 0.5 | Thesis source in `thesis/` from the university template, building locally and in CI | `thesis` | ⬜ |
-| 0.6 | Script that [publishes a draft](#publishing-a-draft-to-overleaf) of the thesis to Overleaf | `chore` | ⬜ |
+| 0.6 | Scripts that [publish a draft to Overleaf and collect the supervisor's review](#drafts-and-supervisor-review) | `chore` | ⬜ |
 
 **Checkpoint `phase-0`:** repository settings are applied, CI checks code and builds the thesis on every pull request, and `draft-1` is on Overleaf.
 
@@ -302,31 +303,61 @@ Tags (`phase-N` and `draft-N`) are never moved or deleted. Phases can overlap: a
 - **Where the source lives.** `thesis/` holds the LaTeX source, starting from the university's Overleaf template, with `main.tex` at its root. Write in any editor. The build command is set up in 0.5, and CI builds the PDF on every pull request.
 - **Same rules as code.** Thesis work follows the same branches and pull requests as everything else (`thesis/<id>-<slug>`). The PR that completes a section ticks its task.
 - **Bibliography and figures.** BibTeX entries go in `thesis/references.bib`, and reading notes go in `docs/notes/`. Figures are produced by scripts in `experiments/`, written to `thesis/figures/` and committed as plain files.
-- **Supervisor feedback.** Feedback that changes the plan becomes a decision record. Feedback on the text goes into the relevant `thesis` task, or into 8.5.
+- **Supervisor feedback** arrives through Overleaf and comes back into the repository through the [review cycle](#drafts-and-supervisor-review).
 
-### Publishing a draft to Overleaf
+### Drafts and supervisor review
 
-The repository is where the thesis is written. Overleaf is where the supervisor reads it, and it changes only when you decide a version is worth showing, such as after a new chapter or a round of edits. Merging to `main` never updates Overleaf by itself.
+The repository is where the thesis is written. Overleaf is where the supervisor reads it, comments on it and suggests edits. Content moves between the two only when you decide, in a cycle:
 
-**To publish:**
+```
+publish draft N → supervisor reviews → you triage in Overleaf → collect into a PR → keep writing → publish draft N+1
+```
 
-1. Merge the thesis work you want to show into `main` as usual.
-2. Run the publish script (written in task 0.6). It:
-   - takes `thesis/` exactly as it is on `origin/main`, whatever you have checked out;
-   - tags that commit `draft-N`, using the next free number, and pushes the tag;
-   - replaces the Overleaf project's files with that snapshot and pushes one commit titled `Draft N (<sha>)`.
-3. Tell the supervisor that draft N is up, and what changed since the last one.
+Both scripts are written in task 0.6.
 
-**What the draft tags give you:**
+**1. Publish a draft.** Do this when a chapter or a round of edits is worth showing. Merging to `main` never updates Overleaf by itself.
 
-- **A record of what the supervisor read.** Every version they saw is a tag, so feedback can be tied to "draft 3".
-- **What changed between drafts.** `git diff draft-2 draft-3 -- thesis/` shows the changes, and `latexdiff` can turn the same two tags into a marked-up PDF for the supervisor.
+- Merge the thesis work you want to show into `main` as usual.
+- Run `scripts/publish-draft`. It:
+  - takes `thesis/` exactly as it is on `origin/main`, whatever you have checked out;
+  - pushes it to Overleaf as one commit titled `Draft N (<sha>)`;
+  - tags that commit on `main` as `draft-N`.
+- Tell the supervisor that draft N is up, and what changed since the last one.
+
+**2. The supervisor reviews in Overleaf.** They leave comments and suggest edits. Track changes is on for everyone in the project, so even a direct edit arrives as a suggestion you can accept or reject.
+
+**3. You triage in Overleaf.**
+
+- **Suggested edits:** accept or reject each one. Accepted edits become part of the Overleaf text.
+- **Comments:** copy each one into `docs/reviews/draft-N.md` (from the [template](docs/reviews/template.md)), noting what you'll do about it. Then reply to it and resolve it in Overleaf. Comments exist only in Overleaf, and a later publish can delete them, so this file is their lasting record.
+
+**4. Collect the accepted edits.** Run `scripts/collect-review`. It:
+
+- fetches the Overleaf project;
+- takes everything that changed there since `draft-N`;
+- applies it to `thesis/` on a new branch `thesis/review-draft-N`, on top of anything you've written since.
+
+Review the diff in your editor, add `docs/reviews/draft-N.md` to the same branch, open a pull request and squash-merge it as usual.
+
+**5. Keep writing, then publish the next draft.** Comments that need real work go into the relevant `thesis` task, or into 8.5. Feedback that changes the plan becomes a [decision record](#recording-decisions).
 
 **Rules:**
 
-- **Overleaf is read-only.** Never edit there. The script refuses to publish if the latest Overleaf commit is not one of its own drafts. Edits made there are first brought into the repository through a pull request.
-- **Overleaf's Git access has limits.** It needs an Overleaf premium licence, which is usually available through the university, and a personal Git token. Its remote has one branch and does not accept force pushes. That is why each draft is a new commit on top of Overleaf's history rather than a copy of this repository's history.
-- **The fallback is a PDF.** If Git access is not available, publishing a draft means tagging `draft-N` and sending the PDF built from that tag.
+- **Write only in the repository.** In Overleaf you only accept or reject suggestions and answer comments.
+- **Never publish into an open review.** A push from git can delete or misplace open comments and tracked changes in Overleaf. `publish-draft` therefore refuses while Overleaf holds edits that haven't been collected, and it asks you to confirm that every comment and suggestion is resolved.
+- **Overleaf's Git access has limits.** It needs an Overleaf premium licence (AGH provides one) and a personal Git token. Its remote has one branch and does not accept force pushes. Both scripts therefore build on top of Overleaf's history and never rewrite it.
+- **The fallback is a PDF.** If Git access stops working, publishing means tagging `draft-N` and sending the PDF built from that tag. Feedback then arrives by email and still goes into `docs/reviews/draft-N.md`.
+
+**Overleaf project settings:**
+
+- Invite the supervisor by email with a role that lets them comment and suggest edits. Overleaf calls it Reviewer; if that role isn't offered, Editor works too.
+- Turn on track changes for everyone.
+- A view-only link lets people read but not comment, so it is only for other readers.
+
+**What the draft tags give you:**
+
+- **A record of what the supervisor read.** Every version they saw is a tag, and its review notes sit in `docs/reviews/`.
+- **What changed between drafts.** `git diff draft-2 draft-3 -- thesis/` shows the changes, and `latexdiff` can turn the same two tags into a marked-up PDF for the supervisor.
 
 ### Repository settings
 
