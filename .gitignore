@@ -8,3 +8,19 @@ wheels/
 
 # Virtual environments
 .venv
+
+# LaTeX build output (thesis/)
+thesis/**/*.aux
+thesis/**/*.bbl
+thesis/**/*.blg
+thesis/**/*.fdb_latexmk
+thesis/**/*.fls
+thesis/**/*.lof
+thesis/**/*.log
+thesis/**/*.lot
+thesis/**/*.out
+thesis/**/*.synctex.gz
+thesis/**/*.toc
+thesis/**/*.xdv
+thesis/*.pdf
+thesis/svg-inkscape/
