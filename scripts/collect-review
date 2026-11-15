@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# Bring the edits accepted on Overleaf since the last draft into the
+# repository, on a new branch thesis/review-draft-N.
+#
+#   scripts/collect-review [--dry-run]
+#
+#   --dry-run  show what changed on Overleaf, change nothing
+#
+# The changes are left uncommitted for review in an editor, together with
+# docs/reviews/draft-N.md, which records the Overleaf commit collected.
+# See README, "Drafts and supervisor review".
+
+set -euo pipefail
+. "$(dirname "$0")/lib/drafts.sh"
+
+dry_run=0
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) dry_run=1 ;;
+    -h|--help) sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) die "unknown option '$arg' (try --help)" ;;
+  esac
+done
+
+cd_repo_root
+require_remote "$ORIGIN_REMOTE"
+require_remote "$OVERLEAF_REMOTE"
+[ -z "$(git status --porcelain)" ] || die "the working tree has uncommitted changes; commit or set them aside first"
+
+fetch_origin
+branch="$(overleaf_branch)"
+fetch_overleaf "$branch"
+
+last="$(last_draft_number)"
+[ -n "$last" ] || die "no draft has been published yet"
+
+overleaf_head="$(git rev-parse "$OVERLEAF_REF")"
+overleaf_tree="$(git rev-parse "$OVERLEAF_REF^{tree}")"
+
+# Compare against what the repository already has from Overleaf: an earlier
+# collection for this draft if there was one, otherwise draft-N itself.
+base_tree="$(commit_tree_or_empty "$(recorded_overleaf_commit "$last")")"
+if [ -n "$base_tree" ]; then
+  base_desc="the review of draft-$last collected earlier"
+else
+  base_tree="$(thesis_tree "draft-$last")"
+  base_desc="draft-$last"
+fi
+
+if [ "$overleaf_tree" = "$base_tree" ]; then
+  info "No new edits on Overleaf since $base_desc. Record any comments in docs/reviews/draft-$last.md by hand."
+  exit 0
+fi
+
+info "Edits on Overleaf since $base_desc:"
+git diff --stat "$base_tree" "$overleaf_tree" | sed 's/^/  /'
+
+if [ "$dry_run" -eq 1 ]; then
+  info "Dry run: no branch created, nothing changed."
+  exit 0
+fi
+
+review_branch="thesis/review-draft-$last"
+if git show-ref --verify --quiet "refs/heads/$review_branch"; then
+  die "branch $review_branch already exists locally; merge or delete it first"
+fi
+if git ls-remote --exit-code --heads "$ORIGIN_REMOTE" "$review_branch" >/dev/null 2>&1; then
+  die "branch $review_branch already exists on $ORIGIN_REMOTE; merge or delete it first"
+fi
+
+git switch --quiet -c "$review_branch" "$ORIGIN_REMOTE/$MAIN_BRANCH"
+
+# Replay Overleaf's changes onto thesis/ as it is on main now. The three-way
+# apply keeps work merged since the draft and marks any real conflict.
+patch="$(mktemp)"
+git diff --binary "$base_tree" "$overleaf_tree" > "$patch"
+conflicts=0
+git apply --3way --directory=thesis "$patch" || conflicts=1
+rm -f "$patch"
+
+# Record which Overleaf commit was collected; publish-draft checks it.
+notes="docs/reviews/draft-$last.md"
+recorded_line="- **Overleaf commit:** \`$overleaf_head\`"
+tmp="$(mktemp)"
+if [ -f "$notes" ]; then
+  sed "s|^- \*\*Overleaf commit:\*\* .*|$recorded_line|" "$notes" > "$tmp"
+else
+  sed -e "s|^# Draft N review|# Draft $last review|" \
+      -e "s|\`draft-N\`|\`draft-$last\`|" \
+      -e "s|^- \*\*Feedback received:\*\* .*|- **Feedback received:** $(date +%Y-%m-%d)|" \
+      -e "s|^- \*\*Overleaf commit:\*\* .*|$recorded_line|" \
+      docs/reviews/template.md > "$tmp"
+fi
+mv "$tmp" "$notes"
+
+if [ "$conflicts" -ne 0 ]; then
+  info ""
+  info "Some Overleaf edits conflict with work merged since draft-$last."
+  info "Resolve the conflict markers in the files git status lists, then continue below."
+fi
+
+info ""
+info "On branch $review_branch, uncommitted:"
+git status --short | sed 's/^/  /'
+info ""
+info "Next:"
+info "  1. Review the changes in your editor."
+info "  2. Fill in $notes: rejected edits worth remembering, and every comment."
+info "  3. Commit as 'thesis(review): apply supervisor edits from draft $last' and open a pull request."
+[ "$conflicts" -eq 0 ] || exit 1

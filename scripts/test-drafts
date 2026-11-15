@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# Run publish-draft and collect-review through a full review cycle against
+# a simulated Overleaf project, in a temporary folder. Touches nothing else.
+#
+#   scripts/test-drafts
+
+set -euo pipefail
+
+scripts="$(cd "$(dirname "$0")" && pwd)"
+template="$scripts/../docs/reviews/template.md"
+sandbox="$(mktemp -d)"
+trap 'rm -rf "$sandbox"' EXIT
+
+# Isolate from the user's git configuration (signing, hooks, aliases).
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+export GIT_AUTHOR_NAME=Test GIT_AUTHOR_EMAIL=test@example.com
+export GIT_COMMITTER_NAME=Test GIT_COMMITTER_EMAIL=test@example.com
+
+passed=0
+pass() { passed=$((passed + 1)); printf 'ok   %s\n' "$1"; }
+fail() { printf 'FAIL %s\n' "$1" >&2; exit 1; }
+
+# expect_fail "<pattern>" <command...>: the command must fail and print the pattern.
+expect_fail() {
+  local pattern="$1" out
+  shift
+  if out="$("$@" 2>&1)"; then fail "expected failure: $*"; fi
+  printf '%s' "$out" | grep -q -- "$pattern" || fail "expected '$pattern' in: $out"
+}
+
+publish() { "$scripts/publish-draft" "$@"; }
+collect() { "$scripts/collect-review" "$@"; }
+
+# What the supervisor does on Overleaf: edit, commit, push.
+on_overleaf() {
+  local message="$1"
+  shift
+  rm -rf "$sandbox/sup"
+  git clone --quiet "$sandbox/overleaf.git" "$sandbox/sup"
+  (cd "$sandbox/sup" && "$@" && git add -A && git commit --quiet -m "$message" && git push --quiet origin HEAD)
+}
+
+# Merge the current branch into main, as a squash-merged PR would.
+merge_into_main() {
+  local branch
+  branch="$(git branch --show-current)"
+  git switch --quiet main
+  git merge --quiet --squash "$branch" > /dev/null
+  git commit --quiet -m "merge $branch"
+  git push --quiet origin main
+  git branch --quiet -D "$branch"
+}
+
+overleaf_tree() { git -C "$sandbox/overleaf.git" rev-parse 'HEAD^{tree}'; }
+main_thesis_tree() { git rev-parse 'origin/main:thesis'; }
+
+# --- Setup: a repository, its GitHub remote, and a blank Overleaf project.
+git init --quiet -b main "$sandbox/work"
+cd "$sandbox/work"
+mkdir -p thesis docs/reviews
+printf 'Intro line\nMiddle line\nEnd line\n' > thesis/thesis.tex
+cp "$template" docs/reviews/template.md
+git add -A && git commit --quiet -m "initial"
+git init --quiet --bare "$sandbox/origin.git"
+git remote add origin "$sandbox/origin.git"
+git push --quiet -u origin main
+
+git init --quiet --bare -b main "$sandbox/overleaf.git"
+git clone --quiet "$sandbox/overleaf.git" "$sandbox/ol-init" 2>/dev/null
+(cd "$sandbox/ol-init" && printf 'blank project\n' > main.tex && git add -A && git commit --quiet -m "Overleaf project created" && git push --quiet origin HEAD:main)
+git remote add overleaf "$sandbox/overleaf.git"
+
+# --- First draft.
+publish --dry-run > /dev/null
+[ -z "$(git tag -l 'draft-*')" ] || fail "dry run must not tag"
+pass "dry run changes nothing"
+
+publish > /dev/null
+[ "$(overleaf_tree)" = "$(main_thesis_tree)" ] || fail "Overleaf must hold thesis/ after draft-1"
+git ls-remote --exit-code --tags origin draft-1 > /dev/null || fail "draft-1 must be pushed to origin"
+git -C "$sandbox/overleaf.git" cat-file -e HEAD:main.tex 2>/dev/null && fail "Overleaf's placeholder main.tex must be gone"
+pass "draft-1 replaces the Overleaf project and is tagged"
+
+expect_fail "unchanged since draft-1" publish --confirm-resolved
+pass "refuses to publish without changes"
+
+# --- Supervisor edits on Overleaf; meanwhile the author keeps writing.
+on_overleaf "Update on Overleaf." sh -c 'sed -i.bak "s/Intro line/Intro line, improved by the supervisor/" thesis.tex && rm thesis.tex.bak && echo note > extra.txt'
+git switch --quiet -c thesis/more-writing
+printf 'Intro line\nMiddle line\nEnd line\nNew section by the author\n' > thesis/thesis.tex
+git commit --quiet -am "more writing"
+merge_into_main
+
+expect_fail "not in the repository yet" publish --confirm-resolved
+pass "refuses to publish over uncollected Overleaf edits"
+
+collect --dry-run > /dev/null
+[ "$(git branch --show-current)" = "main" ] || fail "dry run must not switch branches"
+pass "collect dry run changes nothing"
+
+collect > /dev/null
+[ "$(git branch --show-current)" = "thesis/review-draft-1" ] || fail "collect must switch to thesis/review-draft-1"
+grep -q "improved by the supervisor" thesis/thesis.tex || fail "supervisor edit missing"
+grep -q "New section by the author" thesis/thesis.tex || fail "author's later work lost"
+[ -f thesis/extra.txt ] || fail "file added on Overleaf missing"
+grep -q "Overleaf commit:\*\* \`$(git -C "$sandbox/overleaf.git" rev-parse HEAD)\`" docs/reviews/draft-1.md || fail "notes must record the Overleaf commit"
+grep -q "^# Draft 1 review" docs/reviews/draft-1.md || fail "notes heading not filled in"
+pass "collect merges Overleaf edits with later work and records the commit"
+
+expect_fail "uncommitted changes" collect
+pass "collect refuses to run over uncommitted changes"
+
+git add -A && git commit --quiet -m "thesis(review): apply supervisor edits from draft 1"
+merge_into_main
+
+expect_fail "with --confirm-resolved" publish
+pass "asks for confirmation that the review is resolved"
+
+publish --confirm-resolved > /dev/null
+[ "$(overleaf_tree)" = "$(main_thesis_tree)" ] || fail "Overleaf must hold thesis/ after draft-2"
+git ls-remote --exit-code --tags origin draft-2 > /dev/null || fail "draft-2 must be pushed"
+pass "draft-2 publishes once the review is collected"
+
+# --- Edits after collection, then a conflicting edit.
+on_overleaf "Update on Overleaf." sh -c 'sed -i.bak "s/Middle line/Middle line, per supervisor/" thesis.tex && rm thesis.tex.bak'
+git switch --quiet -c thesis/clash
+sed -i.bak 's/Middle line/Middle line, per author/' thesis/thesis.tex && rm thesis/thesis.tex.bak
+git commit --quiet -am "clash"
+merge_into_main
+
+expect_fail "not in the repository yet" publish --confirm-resolved
+expect_fail "conflict" collect
+git diff --name-only --diff-filter=U | grep -q thesis/thesis.tex || fail "conflict must be marked in thesis.tex"
+pass "conflicting edits stop with conflict markers"
+
+printf '\n%d checks passed\n' "$passed"

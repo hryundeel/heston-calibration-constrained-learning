@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# Publish thesis/ from origin/main to Overleaf as the next draft.
+#
+#   scripts/publish-draft [--dry-run] [--confirm-resolved]
+#
+#   --dry-run           show what would be published, change nothing
+#   --confirm-resolved  required once a draft exists: confirms that every
+#                       comment and suggestion on Overleaf is resolved,
+#                       because a push from git can drop open ones
+#
+# See README, "Drafts and supervisor review".
+
+set -euo pipefail
+. "$(dirname "$0")/lib/drafts.sh"
+
+dry_run=0
+confirmed=0
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) dry_run=1 ;;
+    --confirm-resolved) confirmed=1 ;;
+    -h|--help) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) die "unknown option '$arg' (try --help)" ;;
+  esac
+done
+
+cd_repo_root
+require_remote "$ORIGIN_REMOTE"
+require_remote "$OVERLEAF_REMOTE"
+
+fetch_origin
+branch="$(overleaf_branch)"
+fetch_overleaf "$branch"
+
+source_commit="$(git rev-parse "$ORIGIN_REMOTE/$MAIN_BRANCH")"
+source_short="$(git rev-parse --short "$source_commit")"
+source_tree="$(thesis_tree "$source_commit")"
+overleaf_head="$(git rev-parse "$OVERLEAF_REF")"
+overleaf_tree="$(git rev-parse "$OVERLEAF_REF^{tree}")"
+
+last="$(last_draft_number)"
+if [ -z "$last" ]; then
+  next=1
+  info "No draft published yet: draft-1 replaces everything in the Overleaf project."
+else
+  next=$((last + 1))
+  last_tree="$(thesis_tree "draft-$last")"
+
+  # Nothing new to show.
+  if [ "$source_tree" = "$last_tree" ]; then
+    die "thesis/ on $MAIN_BRANCH is unchanged since draft-$last; nothing to publish"
+  fi
+
+  # Overleaf must hold either draft-N untouched, or edits already collected
+  # into the repository by collect-review (recorded in docs/reviews/).
+  if [ "$overleaf_tree" != "$last_tree" ]; then
+    recorded_tree="$(commit_tree_or_empty "$(recorded_overleaf_commit "$last")")"
+    if [ -z "$recorded_tree" ]; then
+      die "Overleaf has edits since draft-$last that are not in the repository yet. Run scripts/collect-review and merge its pull request first."
+    fi
+    if [ "$recorded_tree" != "$overleaf_tree" ]; then
+      die "Overleaf changed again after the draft-$last review was collected. Run scripts/collect-review again and merge its pull request first."
+    fi
+  fi
+
+  if [ "$confirmed" -ne 1 ] && [ "$dry_run" -ne 1 ]; then
+    die "make sure every comment and suggestion on Overleaf is resolved and recorded in docs/reviews/draft-$last.md, then run again with --confirm-resolved"
+  fi
+fi
+
+message="Draft $next ($source_short)"
+info "Publishing thesis/ from $MAIN_BRANCH at $source_short as draft-$next."
+info "  Overleaf: $OVERLEAF_REMOTE, branch $branch, on top of $(git rev-parse --short "$overleaf_head")"
+info "  Changed files:"
+git diff --stat "$overleaf_tree" "$source_tree" | sed 's/^/    /'
+
+if [ "$dry_run" -eq 1 ]; then
+  info "Dry run: nothing pushed, no tag created."
+  exit 0
+fi
+
+# One new commit on top of Overleaf's history whose tree is exactly thesis/
+# on main. Overleaf only ever sees a fast-forward, so no force push is needed.
+overleaf_commit="$(git commit-tree "$source_tree" -p "$overleaf_head" -m "$message")"
+git push --quiet "$OVERLEAF_REMOTE" "$overleaf_commit:refs/heads/$branch" \
+  || die "Overleaf rejected the push, probably because it changed in the last few seconds. Nothing was tagged; run the script again."
+
+git tag -a "draft-$next" "$source_commit" -m "$message, published to Overleaf as $(git rev-parse --short "$overleaf_commit")"
+git push --quiet "$ORIGIN_REMOTE" "draft-$next" \
+  || die "published to Overleaf, but pushing tag draft-$next to $ORIGIN_REMOTE failed; push it with: git push $ORIGIN_REMOTE draft-$next"
+
+info "Done: draft-$next is on Overleaf and tagged on $MAIN_BRANCH."
+if [ "$next" -eq 1 ]; then
+  info "First draft: in Overleaf, set Menu > Main document to thesis.tex and recompile."
+fi
